@@ -18,12 +18,14 @@ jobs:
         with:
           node-version: '18'
 
-      # NEW STEP: Automatically organizes your files so Capacitor can find them
+      # Updated to make sure ALL your web files (including the QR scanner) are included!
       - name: Prepare Web Assets
         run: |
           mkdir -p src
           if [ -f "index.html" ]; then cp index.html src/index.html; fi
           if [ -f "icon.png" ]; then cp icon.png src/icon.png; fi
+          if [ -f "jsQR.min.js" ]; then cp jsQR.min.js src/jsQR.min.js; fi
+          if [ -f "manifest.json" ]; then cp manifest.json src/manifest.json; fi
 
       - name: Install Dependencies
         run: npm install
@@ -34,6 +36,7 @@ jobs:
       - name: Sync iOS Project
         run: npx cap sync ios
 
+      # ADDED SYMROOT to force Xcode to output to our local 'build' folder
       - name: Build Unsigned iOS App
         run: |
           cd ios/App
@@ -44,6 +47,7 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
+            SYMROOT="$(PWD)/build" \
             build
 
       - name: Package into IPA
