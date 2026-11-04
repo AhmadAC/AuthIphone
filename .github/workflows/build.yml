@@ -10,15 +10,20 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      # Updated to v4
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Updated to v4
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+
+      # NEW STEP: Automatically organizes your files so Capacitor can find them
+      - name: Prepare Web Assets
+        run: |
+          mkdir -p src
+          if [ -f "index.html" ]; then cp index.html src/index.html; fi
+          if [ -f "icon.png" ]; then cp icon.png src/icon.png; fi
 
       - name: Install Dependencies
         run: npm install
@@ -47,7 +52,6 @@ jobs:
           mv ios/App/build/Release-iphoneos/App.app Payload/
           zip -r 2FA-App.ipa Payload
 
-      # Updated to v4
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
