@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Added viewport-fit=cover for iPhone 17 Pro Dynamic Island / Notch compatibility -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>2FA Authenticator</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <style>
+    :root {
+      --bg-color: #0F121A;
+      --card-bg: #141824;
+      --card-border: #23283A;
+      --item-bg: #1A1F30;
+      --item-selected: #283049;
+      --primary-blue: #1E88E5;
+      --otp-blue: #64B5F6;
+      --teal-btn: #0D9488;
+      --danger-red: #D32F2F;
+      --danger-light: #EF5350;
+      --text-muted: #7F869E;
+      --text-sub: #A6ADC8;
+      --text-light: #D0D4E4;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      --mono-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: #FFFFFF;
+      font-family: var(--font-family);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      /* iPhone 17 Pro Safe Area Padding */
+      padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    /* Accounts List */
+    .accounts-list {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 4px;
+      max-height: 160px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .account-item {
+      padding: 12px;
+      border-radius: 6px;
+      background-color: var(--item-bg);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.15s ease;
+    }
+
+    .account-item.active {
+      background-color: var(--item-selected);
+    }
+
+    .account-item .info .name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #FFFFFF;
+    }
+
+    .account-item .info .user {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    .badge-active {
+      color: var(--primary-blue);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    /* Action Buttons */
+    .action-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      flex: 1;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: opacity 0.15s ease, background-color 0.15s ease;
+    }
+
+    .btn:active {
+      opacity: 0.8;
+    }
+
+    .btn-blue {
+      background-color: var(--primary-blue);
+    }
+
+    .btn-teal {
+      background-color: var(--teal-btn);
+    }
+
+    .btn-dark {
+      background-color: #23283C;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 10px 18px;
+    }
+
+    .btn-secondary {
+      background-color: #23283C;
+      border: 1px solid #333A54;
+      color: #FFFFFF;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px;
+    }
+
+    .btn-secondary:hover {
+      background-color: #2B324B;
+    }
+
+    .btn-danger {
+      background-color: var(--danger-red);
+      width: 100%;
+      padding: 14px;
+      font-size: 14px;
+    }
+
+    .btn-danger-outline {
+      background-color: transparent;
+      border: 1px solid var(--danger-red);
+      color: var(--danger-light);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background-color 0.15s ease;
+    }
+
+    .btn-danger-outline:hover {
+      background-color: rgba(211, 47, 47, 0.15);
+    }
+
+    /* Cards */
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 18px;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: #FFFFFF;
+    }
+
+    /* OTP Card */
+    .otp-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 18px;
+    }
+
+    .otp-code {
+      color: var(--otp-blue);
+      font-size: 44px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      font-family: var(--mono-family);
+      margin-bottom: 10px;
+      user-select: all;
+    }
+
+    .progress-bar-container {
+      width: 85%;
+      height: 8px;
+      background-color: var(--bg-color);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background-color: var(--primary-blue);
+      transition: width 0.3s linear;
+    }
+
+    .timer-text {
+      color: #8B92A9;
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+
+    /* Detail Fields */
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .detail-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    .detail-value {
+      font-size: 14px;
+      color: var(--text-light);
+    }
+
+    .detail-value.primary {
+      font-size: 17px;
+      font-weight: 700;
+      color: #FFFFFF;
+    }
+
+    .secret-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .secret-text {
+      font-family: var(--mono-family);
+      font-size: 14px;
+      color: var(--text-light);
+      word-break: break-all;
+    }
+
+    .icon-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-sub);
+      cursor: pointer;
+      padding: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+
+    .icon-btn:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .icon-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+
+    /* Advanced Options */
+    .advanced-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .advanced-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #31364A;
+      transition: 0.3s;
+      border-radius: 24px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--primary-blue);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+
+    .advanced-content {
+      margin-top: 16px;
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .advanced-content.open {
+      display: flex;
+    }
+
+    .pill-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .pill-label {
+      font-size: 14px;
+      color: var(--text-light);
+    }
+
+    .pill-group {
+      display: flex;
+      border: 1px solid #2D3348;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .pill-btn {
+      background-color: #1A1E2D;
+      color: #9BA1B5;
+      border: none;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .pill-btn.selected {
+      background-color: var(--primary-blue);
+      color: #FFFFFF;
+    }
+
+    /* Modal Dialog */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.65);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 100;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 400px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .input-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .input-field label {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    .input-field input {
+      background-color: #1E2436;
+      border: 1px solid #333A54;
+      border-radius: 6px;
+      color: #FFFFFF;
+      padding: 10px 12px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .input-field input:focus {
+      border-color: var(--primary-blue);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .btn-text {
+      background: transparent;
+      border: none;
+      color: var(--text-sub);
+      font-size: 14px;
+      padding: 8px 14px;
+      cursor: pointer;
+    }
+
+    /* Backup Card Section */
+    .backup-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #23283A;
+      color: #FFFFFF;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s ease-in-out;
+      z-index: 200;
+      border: 1px solid #333A54;
+    }
+
+    .toast.show {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Accounts</h1>
+
+    <!-- Account List -->
+    <div id="accountsList" class="accounts-list"></div>
+
+    <!-- Actions -->
+    <div class="action-row">
+      <input type="file" id="qrFileInput" accept="image/*" style="display: none;" />
+      <button class="btn btn-blue" id="selectQrBtn">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path d="M3 3h8v8H3zm2 2v4h4V5zm8-2h8v8h-8zm2 2v4h4V5zM3 13h8v8H3zm2 2v4h4v-4zm13-2h3v2h-3zm-5 0h3v5h-3zm3 3h2v2h-2zm2 2h3v3h-3zm-2 1h2v2h-2zm-3 0h2v2h-2zm5-6h3v2h-3z"/>
+        </svg>
+        Select QR
+      </button>
+
+      <button class="btn btn-teal" id="addManualBtn">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+        </svg>
+        Add Manually
+      </button>
+    </div>
+
+    <!-- Active TOTP Card -->
+    <div class="card otp-card">
+      <div id="otpDisplay" class="otp-code">------</div>
+      <div class="progress-bar-container">
+        <div id="progressBar" class="progress-bar-fill" style="width: 100%;"></div>
+      </div>
+      <div id="timerDisplay" class="timer-text">Expires in: 30s</div>
+      <button class="btn btn-dark" id="copyOtpBtn">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+        </svg>
+        Copy OTP Code
+      </button>
+    </div>
+
+    <!-- Account Details Card -->
+    <div id="accountDetailsCard" class="card" style="display: none;">
+      <div class="field-group">
+        <div>
+          <div class="detail-label">Website Name</div>
+          <div id="detailWebsiteName" class="detail-value primary">-</div>
+        </div>
+        <div>
+          <div class="detail-label">Website Address</div>
+          <div id="detailWebsiteAddress" class="detail-value">-</div>
+        </div>
+        <div>
+          <div class="detail-label">Username</div>
+          <div id="detailUsername" class="detail-value">-</div>
+        </div>
+        <div>
+          <div class="detail-label">Secret Key (Seed, Shared Secret, ...)</div>
+          <div class="secret-row">
+            <span id="detailSecret" class="secret-text">••••••••••••</span>
+            <div style="display: flex;">
+              <button class="icon-btn" id="toggleSecretBtn">
+                <svg id="eyeIcon" viewBox="0 0 24 24">
+                  <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                </svg>
+              </button>
+              <button class="icon-btn" id="copySecretBtn">
+                <svg viewBox="0 0 24 24">
+                  <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Advanced Options Card -->
+    <div id="advancedCard" class="card" style="display: none;">
+      <div class="advanced-header" id="advancedToggleRow">
+        <span class="advanced-title">Advanced Options</span>
+        <label class="switch" onclick="event.stopPropagation();">
+          <input type="checkbox" id="advancedSwitch" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="advanced-content" id="advancedContent">
+        <!-- Algorithm -->
+        <div class="pill-row">
+          <span class="pill-label">Algorithm</span>
+          <div class="pill-group" id="algoPills">
+            <button class="pill-btn" data-val="SHA1">SHA1</button>
+            <button class="pill-btn" data-val="SHA256">SHA256</button>
+            <button class="pill-btn" data-val="SHA512">SHA512</button>
+          </div>
+        </div>
+
+        <!-- Digits -->
+        <div class="pill-row">
+          <span class="pill-label">Digits</span>
+          <div class="pill-group" id="digitsPills">
+            <button class="pill-btn" data-val="6">6</button>
+            <button class="pill-btn" data-val="8">8</button>
+          </div>
+        </div>
+
+        <!-- Period -->
+        <div class="pill-row">
+          <span class="pill-label">Period</span>
+          <div class="pill-group" id="periodPills">
+            <button class="pill-btn" data-val="15">15</button>
+            <button class="pill-btn" data-val="30">30</button>
+            <button class="pill-btn" data-val="60">60</button>
+            <button class="pill-btn" data-val="120">120</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Remove Active Account Button -->
+    <button class="btn btn-danger" id="removeAccountBtn" style="display: none;">
+      Remove Selected Account
+    </button>
+
+    <!-- Backup & Data Management Card -->
+    <div class="card backup-section">
+      <div class="card-title">Backup & Data Management</div>
+      <div class="action-row">
+        <button class="btn btn-secondary" id="exportBackupBtn">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+          </svg>
+          Export Backup
+        </button>
+
+        <input type="file" id="importFileInput" accept=".json,application/json" style="display: none;" />
+        <button class="btn btn-secondary" id="importBackupBtn">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+          </svg>
+          Import Backup
+        </button>
+      </div>
+
+      <button class="btn-danger-outline" id="deleteAllAccountsBtn">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+        </svg>
+        Delete All Accounts
+      </button>
+    </div>
+  </div>
+
+  <!-- Manual Add Modal -->
+  <div class="modal-overlay" id="manualModal">
+    <div class="modal">
+      <div class="modal-title">Add Account Manually</div>
+      <div class="input-field">
+        <label for="manualWebsite">Website Name (e.g. GitHub)</label>
+        <input type="text" id="manualWebsite" placeholder="GitHub" />
+      </div>
+      <div class="input-field">
+        <label for="manualAddress">Website Address</label>
+        <input type="text" id="manualAddress" placeholder="https://github.com" />
+      </div>
+      <div class="input-field">
+        <label for="manualUser">Username</label>
+        <input type="text" id="manualUser" placeholder="username@example.com" />
+      </div>
+      <div class="input-field">
+        <label for="manualSecret">Secret Key (Base32)</label>
+        <input type="text" id="manualSecret" placeholder="JBSWY3DPEHPK3PXP" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-text" id="cancelManualBtn">Cancel</button>
+        <button class="btn btn-teal" id="confirmManualBtn" style="padding: 8px 16px;">Add Account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast">Copied to clipboard!</div>
+
+  <canvas id="qrCanvas" style="display: none;"></canvas>
+
+  <script>
+    // State
+    let accounts = loadAccounts();
+    let selectedIndex = 0;
+    let secretRevealed = false;
+    let lastCopiedCode = "";
+
+    // DOM Elements
+    const accountsList = document.getElementById("accountsList");
+    const accountDetailsCard = document.getElementById("accountDetailsCard");
+    const advancedCard = document.getElementById("advancedCard");
+    const removeAccountBtn = document.getElementById("removeAccountBtn");
+
+    const detailWebsiteName = document.getElementById("detailWebsiteName");
+    const detailWebsiteAddress = document.getElementById("detailWebsiteAddress");
+    const detailUsername = document.getElementById("detailUsername");
+    const detailSecret = document.getElementById("detailSecret");
+    const toggleSecretBtn = document.getElementById("toggleSecretBtn");
+    const copySecretBtn = document.getElementById("copySecretBtn");
+
+    const advancedSwitch = document.getElementById("advancedSwitch");
+    const advancedContent = document.getElementById("advancedContent");
+    const advancedToggleRow = document.getElementById("advancedToggleRow");
+
+    const otpDisplay = document.getElementById("otpDisplay");
+    const progressBar = document.getElementById("progressBar");
+    const timerDisplay = document.getElementById("timerDisplay");
+    const copyOtpBtn = document.getElementById("copyOtpBtn");
+
+    const selectQrBtn = document.getElementById("selectQrBtn");
+    const qrFileInput = document.getElementById("qrFileInput");
+    const addManualBtn = document.getElementById("addManualBtn");
+
+    const manualModal = document.getElementById("manualModal");
+    const cancelManualBtn = document.getElementById("cancelManualBtn");
+    const confirmManualBtn = document.getElementById("confirmManualBtn");
+    const manualWebsite = document.getElementById("manualWebsite");
+    const manualAddress = document.getElementById("manualAddress");
+    const manualUser = document.getElementById("manualUser");
+    const manualSecret = document.getElementById("manualSecret");
+
+    const exportBackupBtn = document.getElementById("exportBackupBtn");
+    const importBackupBtn = document.getElementById("importBackupBtn");
+    const importFileInput = document.getElementById("importFileInput");
+    const deleteAllAccountsBtn = document.getElementById("deleteAllAccountsBtn");
+
+    const toast = document.getElementById("toast");
+
+    // Local Storage Helpers
+    function loadAccounts() {
+      try {
+        const data = localStorage.getItem("authenticator_accounts");
+        return data ? JSON.parse(data) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveAccounts(accs) {
+      localStorage.setItem("authenticator_accounts", JSON.stringify(accs));
+    }
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 2000);
+    }
+
+    function copyText(txt, toastMsg) {
+      navigator.clipboard.writeText(txt).then(() => {
+        if (toastMsg) showToast(toastMsg);
+      }).catch(() => {
+        const area = document.createElement("textarea");
+        area.value = txt;
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand("copy");
+        document.body.removeChild(area);
+        if (toastMsg) showToast(toastMsg);
+      });
+    }
+
+    // Base32 Decoder
+    function decodeBase32(input) {
+      const base32Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+      const clean = input.toUpperCase().replace(/=/g, "").replace(/\s+/g, "");
+      let buffer = 0;
+      let bitsLeft = 0;
+      const bytes = [];
+
+      for (let i = 0; i < clean.length; i++) {
+        const val = base32Chars.indexOf(clean[i]);
+        if (val < 0) continue;
+        buffer = (buffer << 5) | val;
+        bitsLeft += 5;
+        if (bitsLeft >= 8) {
+          bytes.push((buffer >> (bitsLeft - 8)) & 0xff);
+          bitsLeft -= 8;
+        }
+      }
+      return new Uint8Array(bytes);
+    }
+
+    // RFC 6238 TOTP Engine
+    async function generateTotp(secret, digits, period, algorithm) {
+      try {
+        const keyBytes = decodeBase32(secret);
+        if (!keyBytes || keyBytes.length === 0) return "ERROR";
+
+        const epochSeconds = Math.floor(Date.now() / 1000);
+        const counter = Math.floor(epochSeconds / period);
+
+        const counterBuffer = new ArrayBuffer(8);
+        const counterView = new DataView(counterBuffer);
+        const high = Math.floor(counter / 0x100000000);
+        const low = counter >>> 0;
+        counterView.setUint32(0, high);
+        counterView.setUint32(4, low);
+
+        const hashAlgo = algorithm === "SHA256" ? "SHA-256" : (algorithm === "SHA512" ? "SHA-512" : "SHA-1");
+
+        const cryptoKey = await window.crypto.subtle.importKey(
+          "raw",
+          keyBytes,
+          { name: "HMAC", hash: { name: hashAlgo } },
+          false,
+          ["sign"]
+        );
+
+        const signature = await window.crypto.subtle.sign("HMAC", cryptoKey, counterBuffer);
+        const hash = new Uint8Array(signature);
+
+        const offset = hash[hash.length - 1] & 0x0f;
+        const binary =
+          ((hash[offset] & 0x7f) << 24) |
+          ((hash[offset + 1] & 0xff) << 16) |
+          ((hash[offset + 2] & 0xff) << 8) |
+          (hash[offset + 3] & 0xff);
+
+        const otp = binary % Math.pow(10, digits);
+        return otp.toString().padStart(digits, "0");
+      } catch (err) {
+        return "ERROR";
+      }
+    }
+
+    // URI Parser
+    function parseOtpUri(uriString) {
+      const uri = uriString.trim();
+      if (!uri.toLowerCase().startsWith("otpauth://")) {
+        const clean = uri.toUpperCase().replace(/\s+/g, "");
+        if (clean.length >= 8) {
+          return {
+            websiteName: "Custom Key",
+            websiteAddress: "-",
+            username: "Account",
+            secret: clean,
+            algorithm: "SHA1",
+            digits: 6,
+            period: 30,
+            showAdvanced: false
+          };
+        }
+        return null;
+      }
+
+      try {
+        const parsed = new URL(uri);
+        const secret = parsed.searchParams.get("secret");
+        if (!secret) return null;
+
+        let issuer = parsed.searchParams.get("issuer") || "";
+        let name = decodeURIComponent(parsed.pathname.replace(/^\/\/?totp\//i, "").replace(/^\//, ""));
+
+        let websiteName = issuer;
+        if (name.includes(":")) {
+          const parts = name.split(":");
+          if (!websiteName) websiteName = parts[0].trim();
+          name = parts[1].trim();
+        }
+        if (!websiteName) websiteName = "Authenticator";
+
+        const algoParam = (parsed.searchParams.get("algorithm") || "SHA1").toUpperCase();
+        const algorithm = ["SHA1", "SHA256", "SHA512"].includes(algoParam) ? algoParam : "SHA1";
+        const digitsParam = parseInt(parsed.searchParams.get("digits") || "6", 10);
+        const digits = [6, 8].includes(digitsParam) ? digitsParam : 6;
+        const periodParam = parseInt(parsed.searchParams.get("period") || "30", 10);
+        const period = [15, 30, 60, 120].includes(periodParam) ? periodParam : 30;
+
+        return {
+          websiteName: websiteName,
+          websiteAddress: `https://${websiteName.toLowerCase().replace(/\s+/g, "")}.com`,
+          username: name || "User",
+          secret: secret.toUpperCase().replace(/\s+/g, ""),
+          algorithm: algorithm,
+          digits: digits,
+          period: period,
+          showAdvanced: false
+        };
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // UI Updates
+    function renderAccounts() {
+      accountsList.innerHTML = "";
+      if (accounts.length === 0) {
+        accountsList.style.display = "none";
+        accountDetailsCard.style.display = "none";
+        advancedCard.style.display = "none";
+        removeAccountBtn.style.display = "none";
+        otpDisplay.textContent = "------";
+        progressBar.style.width = "0%";
+        timerDisplay.textContent = "Expires in: --";
+        return;
+      }
+
+      accountsList.style.display = "flex";
+      accountDetailsCard.style.display = "block";
+      advancedCard.style.display = "block";
+      removeAccountBtn.style.display = "block";
+
+      if (selectedIndex >= accounts.length) {
+        selectedIndex = Math.max(0, accounts.length - 1);
+      }
+
+      accounts.forEach((acc, index) => {
+        const item = document.createElement("div");
+        item.className = "account-item" + (index === selectedIndex ? " active" : "");
+        item.innerHTML = `
+          <div class="info">
+            <div class="name">${acc.websiteName}</div>
+            <div class="user">${acc.username}</div>
+          </div>
+          ${index === selectedIndex ? '<div class="badge-active">ACTIVE</div>' : ""}
+        `;
+        item.onclick = () => {
+          selectedIndex = index;
+          secretRevealed = false;
+          renderAccounts();
+        };
+        accountsList.appendChild(item);
+      });
+
+      const active = accounts[selectedIndex];
+      detailWebsiteName.textContent = active.websiteName;
+      detailWebsiteAddress.textContent = active.websiteAddress;
+      detailUsername.textContent = active.username;
+      updateSecretDisplay();
+
+      // Advanced options toggle
+      advancedSwitch.checked = !!active.showAdvanced;
+      if (active.showAdvanced) {
+        advancedContent.classList.add("open");
+      } else {
+        advancedContent.classList.remove("open");
+      }
+
+      // Pill selectors
+      syncPillGroup("algoPills", active.algorithm);
+      syncPillGroup("digitsPills", active.digits.toString());
+      syncPillGroup("periodPills", active.period.toString());
+    }
+
+    function syncPillGroup(groupId, value) {
+      const container = document.getElementById(groupId);
+      container.querySelectorAll(".pill-btn").forEach(btn => {
+        if (btn.getAttribute("data-val").toUpperCase() === value.toUpperCase()) {
+          btn.classList.add("selected");
+        } else {
+          btn.classList.remove("selected");
+        }
+      });
+    }
+
+    function updateSecretDisplay() {
+      const active = accounts[selectedIndex];
+      if (!active) return;
+      if (secretRevealed) {
+        detailSecret.textContent = active.secret;
+      } else {
+        detailSecret.textContent = active.secret.slice(0, 3) + "••••••••••••";
+      }
+    }
+
+    toggleSecretBtn.onclick = () => {
+      secretRevealed = !secretRevealed;
+      updateSecretDisplay();
+    };
+
+    copySecretBtn.onclick = () => {
+      const active = accounts[selectedIndex];
+      if (active) copyText(active.secret, "Copied to clipboard!");
+    };
+
+    copyOtpBtn.onclick = () => {
+      const raw = otpDisplay.textContent.replace(/\s+/g, "");
+      if (raw && raw !== "------" && raw !== "ERROR") {
+        copyText(raw, "Copied to clipboard!");
+      }
+    };
+
+    // Advanced Switch
+    advancedToggleRow.onclick = () => {
+      advancedSwitch.checked = !advancedSwitch.checked;
+      handleAdvancedToggle();
+    };
+
+    advancedSwitch.onchange = handleAdvancedToggle;
+
+    function handleAdvancedToggle() {
+      const active = accounts[selectedIndex];
+      if (!active) return;
+      active.showAdvanced = advancedSwitch.checked;
+      saveAccounts(accounts);
+      renderAccounts();
+    }
+
+    // Pill Group Click Handlers
+    function setupPillHandler(groupId, key, isNumber = false) {
+      const container = document.getElementById(groupId);
+      container.querySelectorAll(".pill-btn").forEach(btn => {
+        btn.onclick = () => {
+          const active = accounts[selectedIndex];
+          if (!active) return;
+          const val = btn.getAttribute("data-val");
+          active[key] = isNumber ? parseInt(val, 10) : val;
+          saveAccounts(accounts);
+          renderAccounts();
+        };
+      });
+    }
+
+    setupPillHandler("algoPills", "algorithm");
+    setupPillHandler("digitsPills", "digits", true);
+    setupPillHandler("periodPills", "period", true);
+
+    // Remove Selected Account
+    removeAccountBtn.onclick = () => {
+      if (confirm("Remove selected account?")) {
+        accounts.splice(selectedIndex, 1);
+        selectedIndex = Math.max(0, accounts.length - 1);
+        saveAccounts(accounts);
+        renderAccounts();
+        showToast("Account removed.");
+      }
+    };
+
+    // Export Backup
+    exportBackupBtn.onclick = () => {
+      if (accounts.length === 0) {
+        showToast("No accounts to export!");
+        return;
+      }
+      const dataStr = JSON.stringify(accounts, null, 2);
+      const blob = new Blob([dataStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const dateStr = new Date().toISOString().split("T")[0];
+      a.href = url;
+      a.download = `2fa-accounts-backup-${dateStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("Backup exported successfully!");
+    };
+
+    // Import Backup
+    importBackupBtn.onclick = () => importFileInput.click();
+
+    importFileInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const imported = JSON.parse(event.target.result);
+          if (!Array.isArray(imported)) {
+            alert("Invalid backup format: expected a JSON list of accounts.");
+            return;
+          }
+
+          let addedCount = 0;
+          for (const item of imported) {
+            if (item && item.secret) {
+              accounts.push({
+                websiteName: item.websiteName || "Custom",
+                websiteAddress: item.websiteAddress || "-",
+                username: item.username || "User",
+                secret: item.secret.toUpperCase().replace(/\s+/g, ""),
+                algorithm: ["SHA1", "SHA256", "SHA512"].includes((item.algorithm || "").toUpperCase()) ? item.algorithm.toUpperCase() : "SHA1",
+                digits: [6, 8].includes(parseInt(item.digits, 10)) ? parseInt(item.digits, 10) : 6,
+                period: [15, 30, 60, 120].includes(parseInt(item.period, 10)) ? parseInt(item.period, 10) : 30,
+                showAdvanced: !!item.showAdvanced
+              });
+              addedCount++;
+            }
+          }
+
+          if (addedCount > 0) {
+            selectedIndex = accounts.length - 1;
+            saveAccounts(accounts);
+            renderAccounts();
+            showToast(`Imported ${addedCount} account(s)!`);
+          } else {
+            alert("No valid accounts found in backup file.");
+          }
+        } catch (err) {
+          alert("Error parsing backup file: " + err.message);
+        }
+      };
+      reader.readAsText(file);
+      importFileInput.value = "";
+    };
+
+    // Delete All Accounts
+    deleteAllAccountsBtn.onclick = () => {
+      if (accounts.length === 0) {
+        showToast("No accounts to delete!");
+        return;
+      }
+      const confirmed = confirm(
+        `Are you sure you want to delete ALL ${accounts.length} account(s)?\n\nThis cannot be undone unless you have exported a backup.`
+      );
+      if (confirmed) {
+        accounts = [];
+        selectedIndex = 0;
+        saveAccounts(accounts);
+        renderAccounts();
+        showToast("All accounts deleted.");
+      }
+    };
+
+    // Manual Modal
+    addManualBtn.onclick = () => {
+      manualWebsite.value = "";
+      manualAddress.value = "";
+      manualUser.value = "";
+      manualSecret.value = "";
+      manualModal.classList.add("open");
+    };
+
+    cancelManualBtn.onclick = () => {
+      manualModal.classList.remove("open");
+    };
+
+    confirmManualBtn.onclick = () => {
+      const secret = manualSecret.value.toUpperCase().replace(/\s+/g, "");
+      if (!secret) return;
+      const newAcc = {
+        websiteName: manualWebsite.value.trim() || "Custom",
+        websiteAddress: manualAddress.value.trim() || "-",
+        username: manualUser.value.trim() || "User",
+        secret: secret,
+        algorithm: "SHA1",
+        digits: 6,
+        period: 30,
+        showAdvanced: false
+      };
+      accounts.push(newAcc);
+      selectedIndex = accounts.length - 1;
+      saveAccounts(accounts);
+      manualModal.classList.remove("open");
+      renderAccounts();
+      showToast("Account added!");
+    };
+
+    // QR Image File Selector
+    selectQrBtn.onclick = () => qrFileInput.click();
+
+    qrFileInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.getElementById("qrCanvas");
+          const ctx = canvas.getContext("2d");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0, img.width, img.height);
+          const imageData = ctx.getImageData(0, 0, img.width, img.height);
+
+          if (typeof jsQR !== "undefined") {
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            if (code && code.data) {
+              const parsed = parseOtpUri(code.data);
+              if (parsed) {
+                accounts.push(parsed);
+                selectedIndex = accounts.length - 1;
+                saveAccounts(accounts);
+                renderAccounts();
+                showToast("Account added & code copied!");
+              } else {
+                alert("Invalid 2FA QR code URI");
+              }
+            } else {
+              alert("No readable QR code found in image");
+            }
+          } else {
+            alert("QR library not available offline. Please enter secret manually.");
+          }
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+      qrFileInput.value = "";
+    };
+
+    // 500ms Loop for Real-Time TOTP and Progress Bar
+    setInterval(async () => {
+      const active = accounts[selectedIndex];
+      if (!active || !active.secret) {
+        otpDisplay.textContent = "------";
+        progressBar.style.width = "0%";
+        timerDisplay.textContent = "Expires in: --";
+        return;
+      }
+
+      const period = Math.max(1, active.period);
+      const curTime = Math.floor(Date.now() / 1000);
+      const remainingSeconds = period - (curTime % period);
+
+      timerDisplay.textContent = `Expires in: ${remainingSeconds}s`;
+      progressBar.style.width = `${(remainingSeconds / period) * 100}%`;
+
+      const code = await generateTotp(active.secret, active.digits, active.period, active.algorithm);
+
+      if (code && code !== "ERROR") {
+        const half = Math.max(1, Math.floor(code.length / 2));
+        otpDisplay.textContent = `${code.substring(0, half)}  ${code.substring(half)}`;
+
+        if (code !== lastCopiedCode) {
+          lastCopiedCode = code;
+          copyText(code, false);
+        }
+      } else {
+        otpDisplay.textContent = "ERROR";
+      }
+    }, 500);
+
+    // Initial render
+    renderAccounts();
+  </script>
+</body>
+</html>

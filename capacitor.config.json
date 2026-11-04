@@ -1,0 +1,6 @@
+{
+  "appId": "com.yourname.twofa",
+  "appName": "2FA Auth",
+  "webDir": "src",
+  "bundledWebRuntime": false
+}
